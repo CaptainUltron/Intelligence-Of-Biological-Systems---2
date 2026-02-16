@@ -1,43 +1,62 @@
 from Bio.Seq import Seq
 
-# Your DNA input
+# DNA sequence
 text = ("GTTCCGAAAGGCTAGCGCTAGGCGCCAAGCGGCCGGTTTCCTTGGCGACGGAGAGCGCGGGAATTTTAGA"
-    "TAGATTGTAATTGCGGCTGCGCGGCCGCTGCCCGTGCAGCCAGAGGATCCAGCACCTCTCTTGGGGCTTC"
-    "TCCGTCCTCGGCGCTTGGAAGTACGGATCTTTTTTCTCGGAGAAAAGTTCACTGGAACTGGAAGAAATGG")
+        "TAGATTGTAATTGCGGCTGCGCGGCCGCTGCCCGTGCAGCCAGAGGATCCAGCACCTCTCTTGGGGCTTC"
+        "TCCGTCCTCGGCGCTTGGAAGTACGGATCTTTTTTCTCGGAGAAAAGTTCACTGGAACTGGAAGAAATGG")
 
-# Convert DNA → Protein using Bio
+# Convert DNA to protein
 dna_seq = Seq(text)
 protein_seq = str(dna_seq.translate(to_stop=False)).replace("*", "")
 
 print("Protein Sequence:")
 print(protein_seq)
+print()
 
+# Amino acid molecular weights
 AA_MW = {
-'A':89,'R':174,'N':132,'D':133,'C':121,'Q':146,'E':147,'G':75,
-'H':155,'I':131,'L':131,'K':146,'M':149,'F':165,'P':115,'S':105,
-'T':119,'W':204,'Y':181,'V':117
+    'A':89,'R':174,'N':132,'D':133,'C':121,'Q':146,'E':147,'G':75,
+    'H':155,'I':131,'L':131,'K':146,'M':149,'F':165,'P':115,'S':105,
+    'T':119,'W':204,'Y':181,'V':117
 }
 
+# Length of peptide
 k = 4
 
 def branch_and_bound(protein, k):
     max_weight = 0
     best = ""
+    
+    # Maximum possible weight of any amino acid (for upper bound)
+    MAX_AA = max(AA_MW.values())
 
-    for i in range(len(protein)-k+1):
+    for i in range(len(protein) - k + 1):
         weight = 0
 
         for j in range(k):
-            weight += AA_MW[protein[i+j]]
+            # Add current amino acid weight
+            weight += AA_MW[protein[i + j]]
 
-            # prune if already smaller
-            if weight < max_weight and j == k-1:
+            # Remaining positions
+            remaining = k - j - 1
+
+            # Upper bound if all remaining were the heaviest amino acid
+            upper_bound = weight + remaining * MAX_AA
+
+            # Prune: cannot beat current best
+            if upper_bound <= max_weight:
                 break
 
-        if weight > max_weight:
+        # If full length processed and better weight found
+        if j == k - 1 and weight > max_weight:
             max_weight = weight
             best = protein[i:i+k]
 
     return best, max_weight
 
-print("Branch & Bound:", branch_and_bound(protein_seq, k))
+
+# Run Branch and Bound
+result = branch_and_bound(protein_seq, k)
+print("Branch & Bound Result:")
+print("Best peptide:", result[0])
+print("Weight:", result[1])
