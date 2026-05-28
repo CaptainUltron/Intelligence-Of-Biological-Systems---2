@@ -1,0 +1,73 @@
+{
+  "stageA_XGBoost": {
+    "Val Accuracy": 0.9567,
+    "Val F1": 0.9512,
+    "Val Precision": 0.9525,
+    "Val Recall": 0.9499,
+    "Val ROC-AUC": 0.9911,
+    "Val MCC": 0.9124,
+    "CV F1 mean": 0.951,
+    "CV F1 std": 0.0011,
+    "Train time(s)": 1.35
+  },
+  "stageA_Random Forest": {
+    "Val Accuracy": 0.9506,
+    "Val F1": 0.9442,
+    "Val Precision": 0.9468,
+    "Val Recall": 0.9415,
+    "Val ROC-AUC": 0.991,
+    "Val MCC": 0.8998,
+    "CV F1 mean": 0.9426,
+    "CV F1 std": 0.0021,
+    "Train time(s)": 1.23
+  },
+  "stageA_SVM (RBF)": {
+    "Val Accuracy": 0.9555,
+    "Val F1": 0.9498,
+    "Val Precision": 0.9509,
+    "Val Recall": 0.9488,
+    "Val ROC-AUC": 0.9884,
+    "Val MCC": 0.9099,
+    "CV F1 mean": 0.9518,
+    "CV F1 std": 0.0014,
+    "Train time(s)": 26.32
+  },
+  "stageB_RF Type Classifier": {
+    "Val Macro-F1": 0.9458,
+    "Val Accuracy": 0.9477,
+    "CV F1 mean": 0.9488,
+    "CV F1 std": 0.0027,
+    "Train time(s)": 0.92
+  },
+  "stageB_ET Type Classifier": {
+    "Val Macro-F1": 0.9458,
+    "Val Accuracy": 0.9477,
+    "CV F1 mean": 0.9492,
+    "CV F1 std": 0.0029,
+    "Train time(s)": 0.53
+  },
+  "stageB_GBM Type Classifier": {
+    "Val Macro-F1": 0.9288,
+    "Val Accuracy": 0.9443,
+    "CV F1 mean": 0.948,
+    "CV F1 std": 0.0039,
+    "Train time(s)": 134.19
+  },
+  "__best_stageA__": "XGBoost",
+  "__best_stageB__": "ET Type Classifier",
+  "__test_metrics__": {
+    "StageA_Accuracy": 0.9652,
+    "StageA_F1": 0.9608,
+    "StageA_Precision": 0.9584,
+    "StageA_Recall": 0.9633,
+    "StageA_ROC-AUC": 0.9946,
+    "StageA_MCC": 0.9295,
+    "StageA_AvgPrec": 0.9937,
+    "StageA_TP": 1730,
+    "StageA_TN": 2175,
+    "StageA_FP": 75,
+    "StageA_FN": 66,
+    "n_test": 4046,
+    "TypeAccuracy_allergen_rows": 0.9293
+  }
+}

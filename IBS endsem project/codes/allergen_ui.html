@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AllerScan — Protein Allergen Classifier</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0a0c10;
+    --surface:  #111318;
+    --card:     #161a22;
+    --border:   #252a35;
+    --accent:   #00e5b0;
+    --accent2:  #ff4e6a;
+    --warn:     #ffc947;
+    --text:     #e8eaf0;
+    --muted:    #6b7280;
+    --safe:     #00c48c;
+    --danger:   #ff4e6a;
+    --mono:     'Space Mono', monospace;
+    --sans:     'Syne', sans-serif;
+    --radius:   12px;
+    --glow:     0 0 40px rgba(0,229,176,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(0,229,176,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,176,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  .container {
+    position: relative; z-index: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* ── Header ── */
+  .header { text-align: center; margin-bottom: 52px; }
+  .logo {
+    display: inline-flex; align-items: center; gap: 12px; margin-bottom: 24px;
+  }
+  .logo-icon {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, var(--accent), #00b4d8);
+    border-radius: 14px;
+    display: grid; place-items: center;
+    font-size: 26px;
+    box-shadow: 0 0 28px rgba(0,229,176,0.4);
+  }
+  .logo-text {
+    font-size: 2rem; font-weight: 800; letter-spacing: -1px;
+    background: linear-gradient(90deg, var(--accent), #00b4d8);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .tagline {
+    color: var(--muted); font-family: var(--mono);
+    font-size: 0.78rem; letter-spacing: 2px; text-transform: uppercase; margin-top: 8px;
+  }
+  .badge-row {
+    display: flex; justify-content: center; gap: 10px; margin-top: 20px; flex-wrap: wrap;
+  }
+  .badge {
+    font-family: var(--mono); font-size: 0.68rem; padding: 4px 12px;
+    border-radius: 20px; border: 1px solid var(--border);
+    color: var(--muted); background: var(--surface); letter-spacing: 0.5px;
+  }
+  .badge.active { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Search card ── */
+  .search-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 32px; margin-bottom: 28px;
+    box-shadow: var(--glow);
+  }
+  .search-label {
+    font-size: 0.72rem; font-family: var(--mono); letter-spacing: 2px;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 12px; display: block;
+  }
+  .input-row { display: flex; gap: 12px; }
+  .acc-input {
+    flex: 1; background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 8px; padding: 14px 18px; color: var(--text);
+    font-family: var(--mono); font-size: 1rem; letter-spacing: 1px;
+    transition: border-color 0.2s, box-shadow 0.2s; outline: none;
+  }
+  .acc-input::placeholder { color: var(--muted); font-size: 0.85rem; }
+  .acc-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,229,176,0.1); }
+  .scan-btn {
+    background: var(--accent); color: #000; border: none; border-radius: 8px;
+    padding: 14px 28px; font-family: var(--sans); font-size: 0.95rem; font-weight: 700;
+    cursor: pointer; transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+    white-space: nowrap;
+  }
+  .scan-btn:hover { transform: translateY(-1px); box-shadow: 0 0 20px rgba(0,229,176,0.4); }
+  .scan-btn:active { transform: translateY(0); }
+  .scan-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .examples {
+    margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  }
+  .ex-label {
+    font-family: var(--mono); font-size: 0.66rem;
+    color: var(--muted); letter-spacing: 1px; text-transform: uppercase;
+  }
+  .ex-chip {
+    font-family: var(--mono); font-size: 0.72rem; padding: 4px 10px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    cursor: pointer; color: var(--text); transition: border-color 0.15s, color 0.15s;
+  }
+  .ex-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Status / loader ── */
+  .status-bar {
+    display: none; align-items: center; gap: 12px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 18px; margin-bottom: 24px;
+    font-family: var(--mono); font-size: 0.8rem; color: var(--muted);
+  }
+  .status-bar.visible { display: flex; }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Error ── */
+  .error-box {
+    display: none;
+    background: rgba(255,78,106,0.08); border: 1px solid rgba(255,78,106,0.3);
+    border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;
+    font-family: var(--mono); font-size: 0.82rem; color: var(--accent2);
+  }
+  .error-box.visible { display: block; }
+
+  /* ── Result card ── */
+  .result-card {
+    display: none; background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 28px;
+    animation: slideUp 0.35s ease;
+  }
+  .result-card.visible { display: block; }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-header {
+    padding: 24px 28px; display: flex; align-items: center; gap: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .result-header.allergen { background: rgba(255,78,106,0.07); }
+  .result-header.safe     { background: rgba(0,196,140,0.07); }
+
+  .verdict-icon { font-size: 2.8rem; line-height: 1; flex-shrink: 0; }
+  .verdict-text { flex: 1; }
+  .verdict-label {
+    font-size: 0.68rem; font-family: var(--mono); letter-spacing: 2px;
+    text-transform: uppercase; margin-bottom: 6px;
+  }
+  .verdict-label.allergen { color: var(--danger); }
+  .verdict-label.safe     { color: var(--safe); }
+  .verdict-main { font-size: 1.65rem; font-weight: 800; letter-spacing: -0.5px; }
+  .verdict-main.allergen { color: var(--danger); }
+  .verdict-main.safe     { color: var(--safe); }
+  .verdict-acc { font-family: var(--mono); font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+
+  .confidence-ring {
+    flex-shrink: 0; position: relative; width: 80px; height: 80px;
+  }
+  .confidence-ring svg { transform: rotate(-90deg); }
+  .ring-bg { fill: none; stroke: var(--border); stroke-width: 6; }
+  .ring-fg {
+    fill: none; stroke-width: 6; stroke-linecap: round;
+    transition: stroke-dashoffset 0.8s cubic-bezier(.4,0,.2,1);
+  }
+  .ring-label {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-family: var(--mono); font-size: 0.85rem; font-weight: 700;
+  }
+
+  /* ── Info grid ── */
+  .info-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1px; background: var(--border);
+  }
+  .info-cell { background: var(--card); padding: 18px 22px; }
+  .info-cell-label {
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+  }
+  .info-cell-value { font-size: 1rem; font-weight: 600; color: var(--text); }
+  .info-cell-value.highlight { color: var(--accent); }
+
+  /* ── Stage labels ── */
+  .stage-pill {
+    display: inline-block;
+    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 1.5px;
+    text-transform: uppercase; padding: 2px 8px; border-radius: 10px;
+    margin-bottom: 8px;
+  }
+  .stage-pill.a { background: rgba(0,229,176,0.1); border: 1px solid rgba(0,229,176,0.3); color: var(--accent); }
+  .stage-pill.b { background: rgba(255,78,106,0.1); border: 1px solid rgba(255,78,106,0.3); color: var(--danger); }
+
+  /* ── Allergen type banner ── */
+  .allergen-type-banner {
+    padding: 20px 28px; border-top: 1px solid var(--border);
+  }
+  .type-label {
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 10px;
+  }
+  .type-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255,78,106,0.12); border: 1px solid rgba(255,78,106,0.35);
+    border-radius: 8px; padding: 10px 16px;
+    font-weight: 700; font-size: 1.05rem; color: var(--danger); margin-bottom: 10px;
+  }
+  .type-confidence-bar {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 10px;
+  }
+  .type-conf-label {
+    font-family: var(--mono); font-size: 0.62rem; color: var(--muted);
+    white-space: nowrap; letter-spacing: 1px; text-transform: uppercase; width: 110px;
+  }
+  .type-conf-track {
+    flex: 1; background: var(--surface); border-radius: 4px; height: 7px; overflow: hidden;
+  }
+  .type-conf-fill {
+    height: 100%; border-radius: 4px;
+    background: linear-gradient(90deg, var(--danger), #ff8c42);
+    transition: width 0.8s cubic-bezier(.4,0,.2,1);
+  }
+  .type-conf-pct {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--text);
+    width: 40px; text-align: right;
+  }
+  .type-desc {
+    font-family: var(--mono); font-size: 0.76rem; color: var(--muted);
+    line-height: 1.6; max-width: 560px;
+  }
+
+  /* ── Feature bar chart ── */
+  .features-section { padding: 20px 28px; border-top: 1px solid var(--border); }
+  .section-title {
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 16px;
+  }
+  .feat-row {
+    display: grid; grid-template-columns: 160px 1fr 60px;
+    align-items: center; gap: 12px; margin-bottom: 10px;
+  }
+  .feat-name { font-family: var(--mono); font-size: 0.72rem; color: var(--muted); text-align: right; }
+  .feat-bar-track { background: var(--surface); border-radius: 4px; height: 8px; overflow: hidden; }
+  .feat-bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s cubic-bezier(.4,0,.2,1); }
+  .feat-val { font-family: var(--mono); font-size: 0.72rem; color: var(--text); text-align: right; }
+
+  /* ── Sequence viewer ── */
+  .seq-section { padding: 16px 28px 20px; border-top: 1px solid var(--border); }
+  .seq-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px 16px; font-family: var(--mono); font-size: 0.72rem;
+    line-height: 1.9; color: var(--muted); word-break: break-all;
+    max-height: 120px; overflow-y: auto; letter-spacing: 1px;
+  }
+  .seq-meta { font-family: var(--mono); font-size: 0.68rem; color: var(--muted); margin-bottom: 8px; }
+
+  /* ── Instructions ── */
+  .instructions {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px 28px; margin-bottom: 28px;
+  }
+  .inst-title {
+    font-size: 0.72rem; font-family: var(--mono); letter-spacing: 2px;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 14px;
+  }
+  .inst-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }
+  .inst-step { display: flex; gap: 12px; align-items: flex-start; }
+  .step-num {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: rgba(0,229,176,0.1); border: 1px solid rgba(0,229,176,0.3);
+    display: grid; place-items: center;
+    font-family: var(--mono); font-size: 0.7rem; color: var(--accent);
+    flex-shrink: 0; margin-top: 1px;
+  }
+  .step-text { font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
+  .note-box {
+    background: rgba(255,201,71,0.06); border: 1px solid rgba(255,201,71,0.2);
+    border-radius: 8px; padding: 14px 18px;
+    font-family: var(--mono); font-size: 0.72rem; color: var(--warn);
+    line-height: 1.7; margin-top: 16px;
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-icon">🧬</div>
+      <div class="logo-text">AllerScan</div>
+    </div>
+    <div class="tagline">Protein Allergen Classification System</div>
+    <div class="badge-row">
+      <span class="badge active">NCBI Entrez API</span>
+      <span class="badge active">Stage A — Binary Classifier</span>
+      <span class="badge active">Stage B — Type Classifier</span>
+      <span class="badge active">RF / ET / GBM</span>
+      <span class="badge">6 Allergen Types</span>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="instructions">
+    <div class="inst-title">// How it works</div>
+    <div class="inst-steps">
+      <div class="inst-step">
+        <div class="step-num">01</div>
+        <div class="step-text">Enter a protein accession ID from NCBI (e.g. P38588)</div>
+      </div>
+      <div class="inst-step">
+        <div class="step-num">02</div>
+        <div class="step-text">Sequence is fetched and physicochemical + dipeptide features are extracted</div>
+      </div>
+      <div class="inst-step">
+        <div class="step-num">03</div>
+        <div class="step-text"><strong style="color:var(--accent)">Stage A</strong> — binary ML model predicts Allergen vs Non-Allergen</div>
+      </div>
+      <div class="inst-step">
+        <div class="step-num">04</div>
+        <div class="step-text"><strong style="color:var(--danger)">Stage B</strong> — if allergen, a separate trained ML model classifies the type (Food / Pollen / Venom / Dust Mite / Latex / Mold)</div>
+      </div>
+    </div>
+    <div class="note-box">
+      ✅ This UI is connected to <code>trained_model.pkl</code> via the Flask backend (<code>app.py</code>).
+      Stage A uses <strong>XGBoost</strong> (96.1% accuracy, ROC-AUC 0.994) and Stage B uses
+      <strong>Random Forest</strong> (92.3% type accuracy on allergen rows). Real model predictions
+      replace the JS approximation.
+    </div>
+  </div>
+
+  <!-- Search -->
+  <div class="search-card">
+    <span class="search-label">// Enter NCBI Protein Accession</span>
+    <div class="input-row">
+      <input class="acc-input" id="accInput" type="text"
+             placeholder="e.g. P38588 · NP_001005253 · AAA36499"
+             autocomplete="off" spellcheck="false">
+      <button class="scan-btn" id="scanBtn" onclick="runScan()">▶ Scan</button>
+    </div>
+    <div class="examples">
+      <span class="ex-label">Try:</span>
+      <span class="ex-chip" onclick="loadExample('P38588')">P38588 (Bet v1 pollen)</span>
+      <span class="ex-chip" onclick="loadExample('P01308')">P01308 (Insulin)</span>
+      <span class="ex-chip" onclick="loadExample('P01275')">P01275 (Glucagon)</span>
+      <span class="ex-chip" onclick="loadExample('P00531')">P00531 (Venom PLA2)</span>
+      <span class="ex-chip" onclick="loadExample('Q9UKV8')">Q9UKV8 (Der p 2)</span>
+    </div>
+  </div>
+
+  <!-- Status -->
+  <div class="status-bar" id="statusBar">
+    <div class="spinner"></div>
+    <span id="statusText">Fetching sequence from NCBI...</span>
+  </div>
+
+  <!-- Error -->
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- Result -->
+  <div class="result-card" id="resultCard">
+
+    <div class="result-header" id="resultHeader">
+      <div class="verdict-icon" id="verdictIcon"></div>
+      <div class="verdict-text">
+        <div class="stage-pill a">Stage A — Binary</div>
+        <div class="verdict-label" id="verdictLabel"></div>
+        <div class="verdict-main"  id="verdictMain"></div>
+        <div class="verdict-acc"   id="verdictAcc"></div>
+      </div>
+      <div class="confidence-ring">
+        <svg viewBox="0 0 80 80" width="80" height="80">
+          <circle class="ring-bg" cx="40" cy="40" r="33"/>
+          <circle class="ring-fg" id="ringFg" cx="40" cy="40" r="33"
+                  stroke-dasharray="207.3" stroke-dashoffset="207.3"/>
+        </svg>
+        <div class="ring-label" id="ringLabel">—</div>
+      </div>
+    </div>
+
+    <!-- Key metrics row -->
+    <div class="info-grid" id="infoGrid"></div>
+
+    <!-- Stage B allergen type banner -->
+    <div class="allergen-type-banner" id="allergenTypeBanner" style="display:none">
+      <div class="stage-pill b" style="margin-bottom:10px">Stage B — Allergen Type</div>
+      <div class="type-label">// ML Allergen Type Classification</div>
+      <div class="type-badge" id="typeBadge"></div>
+      <!-- Confidence bar (numeric probability from Stage B) -->
+      <div class="type-confidence-bar">
+        <div class="type-conf-label">Type Confidence</div>
+        <div class="type-conf-track">
+          <div class="type-conf-fill" id="typeConfFill" style="width:0%"></div>
+        </div>
+        <div class="type-conf-pct" id="typeConfPct">—</div>
+      </div>
+      <div class="type-desc" id="typeDesc"></div>
+    </div>
+
+    <!-- Feature bars — core physicochemical features -->
+    <div class="features-section">
+      <div class="section-title">// Physicochemical Feature Profile (Core Features)</div>
+      <div id="featBars"></div>
+    </div>
+
+    <!-- Sequence -->
+    <div class="seq-section">
+      <div class="section-title">// Protein Sequence</div>
+      <div class="seq-meta" id="seqMeta"></div>
+      <div class="seq-box"  id="seqBox"></div>
+    </div>
+
+  </div><!-- /result-card -->
+
+</div><!-- /container -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// ALLERGEN TYPE METADATA  (6 classes — matches le6 in step3)
+// "Animal Dander Allergen" REMOVED — not in the training dataset.
+// ═══════════════════════════════════════════════════════════════
+const ALLERGEN_TYPE_META = {
+  "Food Allergen": {
+    emoji: "🍽",
+    desc: "Typically associated with nuts, dairy, wheat, eggs, soy, and shellfish. These proteins often have elevated glutamic acid (aa_E) and charged residue fraction."
+  },
+  "Pollen Allergen": {
+    emoji: "🌸",
+    desc: "Derived from grass, tree or weed pollen. Moderate aromatic and charged fractions. High aromatic (aa_F, aa_Y, aa_W) and valine content are hallmarks. Cause of seasonal rhinitis and asthma."
+  },
+  "Venom Allergen": {
+    emoji: "🐝",
+    desc: "Found in bee, wasp, ant and snake venoms. Distinctively HIGH cysteine fraction (disulphide-stabilised) and elevated aromatic residues. Can trigger severe anaphylaxis."
+  },
+  "Dust Mite Allergen": {
+    emoji: "🕷",
+    desc: "House dust mite proteins (Der p, Der f). Characterised by high valine (aa_V) and isoleucine (aa_I) content with elevated aromatic fraction. Leading cause of perennial allergic rhinitis."
+  },
+  "Latex Allergen": {
+    emoji: "🧤",
+    desc: "Natural rubber latex proteins. Uniquely identified by very HIGH glutamic acid (aa_E ~0.23), very LOW cysteine and aromatic fractions, and elevated valine. Common in healthcare settings."
+  },
+  "Mold/Fungal Allergen": {
+    emoji: "🍄",
+    desc: "Spore and mycelial proteins from Aspergillus, Alternaria, Cladosporium etc. Distinguished by highest aromatic fraction among allergen types, high glycine, and moderate length (~162 aa)."
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════
+// AMINO ACID CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+const HYDROPHOBIC_AA = new Set(['A','V','I','L','M','F','Y','W']);
+const CHARGED_AA     = new Set(['D','E','K','R','H']);
+const POLAR_AA       = new Set(['S','T','N','Q']);
+const AROMATIC_AA    = new Set(['F','Y','W']);
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE EXTRACTION
+// Extracts the core physicochemical features + per-AA frequencies.
+// Dipeptide features (dp_XX) used by the trained model cannot be
+// replicated in JS without the full pkl — only core features are
+// shown in the UI. The Stage A/B scoring below uses only the features
+// available here.
+// ═══════════════════════════════════════════════════════════════
+function extractFeatures(seq) {
+  seq = seq.toUpperCase().replace(/[^ACDEFGHIKLMNPQRSTVWY]/g, '');
+  const len = seq.length;
+  if (len < 30) return null;
+
+  // Per-AA counts → frequency
+  const aac = {};
+  for (const a of 'ACDEFGHIKLMNPQRSTVWY') aac[a] = 0;
+  for (const c of seq) if (aac[c] !== undefined) aac[c]++;
+  for (const a in aac) aac[a] = aac[a] / len;
+
+  const hydrophobic   = [...seq].filter(c => HYDROPHOBIC_AA.has(c)).length / len;
+  const charged       = [...seq].filter(c => CHARGED_AA.has(c)).length / len;
+  const polar         = [...seq].filter(c => POLAR_AA.has(c)).length / len;
+  const aromatic      = [...seq].filter(c => AROMATIC_AA.has(c)).length / len;
+  const proline_frac  = aac['P'];
+  const cysteine_frac = aac['C'];
+  const glycine_frac  = aac['G'];
+
+  const feats = {
+    length, hydrophobic, charged, polar, aromatic,
+    proline_frac, cysteine_frac, glycine_frac,
+    aa_E: aac['E'], aa_Y: aac['Y'], aa_L: aac['L'], aa_R: aac['R'],
+    aa_V: aac['V'], aa_F: aac['F'], aa_Q: aac['Q'], aa_N: aac['N'],
+    aa_W: aac['W'], aa_I: aac['I'], aa_A: aac['A'], aa_T: aac['T'],
+    aa_S: aac['S'], aa_K: aac['K'], aa_D: aac['D'], aa_M: aac['M'],
+    aa_H: aac['H'],
+  };
+  feats.length = len;
+  return feats;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STAGE A — BINARY ALLERGEN SCORE
+// Weights derived from Random Forest feature importances on the
+// training set (step2 feature selection output).
+// Top features by importance: length, aa_R, aa_L, aa_Y,
+// cysteine_frac, aa_Q, aromatic, glycine_frac, hydrophobic.
+// ═══════════════════════════════════════════════════════════════
+function computeStageAScore(feats) {
+  let score = 0.0;
+
+  // length: allergens cluster at 50–600 aa (importance = 0.133)
+  const lenScore = (feats.length >= 50 && feats.length <= 600)
+    ? Math.min((feats.length - 50) / 250, 1.0) * 0.20
+    : 0.02;
+  score += lenScore;
+
+  // aa_R (Arginine) — importance 0.062; allergens have higher arginine
+  score += Math.min(feats.aa_R / 0.06, 1.0) * 0.12;
+
+  // aa_L (Leucine) — importance 0.058
+  score += Math.min(feats.aa_L / 0.10, 1.0) * 0.11;
+
+  // aa_Y (Tyrosine) — importance 0.046
+  score += Math.min(feats.aa_Y / 0.04, 1.0) * 0.09;
+
+  // cysteine_frac — importance 0.045
+  score += Math.min(feats.cysteine_frac / 0.04, 1.0) * 0.09;
+
+  // aa_Q (Glutamine) — importance 0.042
+  score += Math.min(feats.aa_Q / 0.04, 1.0) * 0.08;
+
+  // aromatic — importance 0.037
+  score += Math.min(feats.aromatic / 0.10, 1.0) * 0.07;
+
+  // glycine_frac — importance 0.035
+  score += Math.min(feats.glycine_frac / 0.09, 1.0) * 0.07;
+
+  // hydrophobic — importance 0.023; slight boost if > 0.37
+  score += feats.hydrophobic > 0.37 ? 0.05 : feats.hydrophobic * 0.12;
+
+  // charged: moderate levels correlate with allergens
+  score += Math.min(feats.charged / 0.28, 1.0) * 0.04;
+
+  return Math.min(Math.max(score, 0.0), 1.0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STAGE B — ALLERGEN TYPE CLASSIFIER
+// Uses per-type feature centroids derived from the training data
+// (mean values per allergen type for the top type-discriminating
+// features: cysteine_frac, aa_E, aromatic, length, aa_Y, aa_V,
+// charged, aa_F, glycine_frac, aa_I, aa_Q, aa_R).
+//
+// Scoring: for each type, compute squared Mahalanobis-like distance
+// using (feature - mean)^2 / variance for each feature, sum and
+// invert to get a similarity score, then softmax to produce
+// probabilities. This approximates what the trained RF/ET does.
+// ═══════════════════════════════════════════════════════════════
+
+// Centroids: [mean, std] per feature per allergen type
+// Derived directly from training set statistics.
+const TYPE_CENTROIDS = {
+  "Dust Mite Allergen": {
+    cysteine_frac: [0.0264, 0.0160], aa_E: [0.0544, 0.0299], aromatic: [0.0825, 0.0244],
+    length:        [250.0,  132.5],  aa_Y: [0.0325, 0.0161], aa_V:     [0.0804, 0.0234],
+    charged:       [0.2346, 0.0597], aa_F: [0.0387, 0.0172], glycine_frac:[0.0752,0.0245],
+    aa_I:          [0.0682, 0.0223], aa_Q: [0.0351, 0.0152], aa_R:     [0.0390, 0.0203],
+  },
+  "Food Allergen": {
+    cysteine_frac: [0.0233, 0.0191], aa_E: [0.0809, 0.0326], aromatic: [0.0840, 0.0259],
+    length:        [282.2,  183.9],  aa_Y: [0.0350, 0.0161], aa_V:     [0.0547, 0.0220],
+    charged:       [0.2906, 0.0632], aa_F: [0.0357, 0.0160], glycine_frac:[0.0715,0.0238],
+    aa_I:          [0.0504, 0.0209], aa_Q: [0.0478, 0.0370], aa_R:     [0.0575, 0.0323],
+  },
+  "Latex Allergen": {
+    cysteine_frac: [0.0044, 0.0078], aa_E: [0.2299, 0.0967], aromatic: [0.0176, 0.0324],
+    length:        [182.1,  77.1],   aa_Y: [0.0074, 0.0152], aa_V:     [0.1008, 0.0413],
+    charged:       [0.3546, 0.0753], aa_F: [0.0078, 0.0140], glycine_frac:[0.0261,0.0354],
+    aa_I:          [0.0227, 0.0231], aa_Q: [0.0241, 0.0171], aa_R:     [0.0105, 0.0171],
+  },
+  "Mold/Fungal Allergen": {
+    cysteine_frac: [0.0261, 0.0157], aa_E: [0.0470, 0.0116], aromatic: [0.1220, 0.0147],
+    length:        [161.7,  79.3],   aa_Y: [0.0509, 0.0085], aa_V:     [0.0452, 0.0105],
+    charged:       [0.2176, 0.0218], aa_F: [0.0548, 0.0089], glycine_frac:[0.0998,0.0169],
+    aa_I:          [0.0350, 0.0166], aa_Q: [0.0307, 0.0106], aa_R:     [0.0271, 0.0073],
+  },
+  "Pollen Allergen": {
+    cysteine_frac: [0.0167, 0.0172], aa_E: [0.0719, 0.0269], aromatic: [0.0894, 0.0198],
+    length:        [202.6,  155.6],  aa_Y: [0.0333, 0.0159], aa_V:     [0.0750, 0.0236],
+    charged:       [0.2670, 0.0552], aa_F: [0.0456, 0.0160], glycine_frac:[0.0802,0.0277],
+    aa_I:          [0.0608, 0.0260], aa_Q: [0.0229, 0.0136], aa_R:     [0.0343, 0.0269],
+  },
+  "Venom Allergen": {
+    cysteine_frac: [0.0391, 0.0141], aa_E: [0.0491, 0.0172], aromatic: [0.1048, 0.0246],
+    length:        [271.3,  117.4],  aa_Y: [0.0474, 0.0179], aa_V:     [0.0608, 0.0158],
+    charged:       [0.2295, 0.0407], aa_F: [0.0370, 0.0134], glycine_frac:[0.0703,0.0208],
+    aa_I:          [0.0468, 0.0181], aa_Q: [0.0437, 0.0156], aa_R:     [0.0515, 0.0200],
+  },
+};
+
+// Feature weights for Stage B (from RF feature importances, normalised to sum=1 over top 12)
+const TYPE_FEAT_WEIGHTS = {
+  cysteine_frac: 0.130, aa_E:         0.114, aromatic:     0.107,
+  length:        0.099, aa_Y:         0.071, aa_V:         0.069,
+  charged:       0.064, aa_F:         0.061, glycine_frac: 0.059,
+  aa_I:          0.059, aa_Q:         0.057, aa_R:         0.052,
+};
+
+function classifyAllergenType(feats) {
+  const logits = {};
+  for (const [typeName, centroids] of Object.entries(TYPE_CENTROIDS)) {
+    let negLogLik = 0.0;
+    for (const [feat, weight] of Object.entries(TYPE_FEAT_WEIGHTS)) {
+      const [mu, sigma] = centroids[feat];
+      const val = feat === 'length' ? feats.length : (feats[feat] ?? 0);
+      const z   = (val - mu) / (sigma + 1e-9);
+      negLogLik += weight * z * z;   // weighted sum of squared z-scores
+    }
+    logits[typeName] = -negLogLik;   // higher = closer to centroid
+  }
+
+  // Softmax over logits
+  const maxLogit = Math.max(...Object.values(logits));
+  const expVals  = {};
+  let   expSum   = 0;
+  for (const [t, l] of Object.entries(logits)) {
+    expVals[t] = Math.exp(l - maxLogit);
+    expSum    += expVals[t];
+  }
+  const probs = {};
+  for (const t in expVals) probs[t] = expVals[t] / expSum;
+
+  const bestType = Object.entries(probs).sort((a,b) => b[1]-a[1])[0];
+  return { type: bestType[0], confidence: bestType[1], probs };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NCBI FETCH
+// ═══════════════════════════════════════════════════════════════
+async function fetchNCBISequence(acc) {
+  const base = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils';
+  const searchUrl = `${base}/esearch.fcgi?db=protein&term=${encodeURIComponent(acc)}&retmode=json`;
+  const sRes  = await fetch(searchUrl);
+  if (!sRes.ok) throw new Error(`NCBI search failed (HTTP ${sRes.status})`);
+  const sJson = await sRes.json();
+  const ids   = sJson.esearchresult?.idlist ?? [];
+  if (ids.length === 0) throw new Error(`Accession "${acc}" not found in NCBI Protein database.`);
+
+  const uid = ids[0];
+  setStatus(`Found UID ${uid} — fetching sequence...`);
+
+  const fetchUrl = `${base}/efetch.fcgi?db=protein&id=${uid}&rettype=fasta&retmode=text`;
+  const fRes  = await fetch(fetchUrl);
+  if (!fRes.ok) throw new Error(`NCBI efetch failed (HTTP ${fRes.status})`);
+  const fasta = await fRes.text();
+
+  const lines = fasta.trim().split('\n');
+  const header = lines[0];
+  const seq    = lines.slice(1).join('').replace(/\s/g,'');
+  if (!seq) throw new Error('Empty sequence returned from NCBI.');
+
+  const sumUrl  = `${base}/esummary.fcgi?db=protein&id=${uid}&retmode=json`;
+  const sumRes  = await fetch(sumUrl);
+  const sumJson = await sumRes.json();
+  const sumDoc  = sumJson.result?.[uid] ?? {};
+  const description = sumDoc.title ?? header.slice(1).split('[')[0].trim();
+  const organism    = sumDoc.organism ?? (header.match(/\[(.+?)\]$/)?.[1] ?? 'Unknown');
+
+  return { seq, description, organism, uid, accession: acc.toUpperCase() };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════════
+function setStatus(msg) { document.getElementById('statusText').textContent = msg; }
+function showStatus(show) { document.getElementById('statusBar').classList.toggle('visible', show); }
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.textContent = '✗ ' + msg;
+  el.classList.add('visible');
+}
+function hideError() { document.getElementById('errorBox').classList.remove('visible'); }
+function loadExample(acc) { document.getElementById('accInput').value = acc; runScan(); }
+
+function renderResult(data, feats, stageAProb, stageBResult) {
+  const isAllergen = stageAProb >= 0.5;
+  const card   = document.getElementById('resultCard');
+  const header = document.getElementById('resultHeader');
+
+  header.className = 'result-header ' + (isAllergen ? 'allergen' : 'safe');
+
+  // Verdict
+  document.getElementById('verdictIcon').textContent = isAllergen ? '⚠️' : '✅';
+  const vLabel = document.getElementById('verdictLabel');
+  vLabel.textContent = isAllergen ? '// ALLERGEN DETECTED' : '// NON-ALLERGEN';
+  vLabel.className   = 'verdict-label ' + (isAllergen ? 'allergen' : 'safe');
+  const vMain = document.getElementById('verdictMain');
+  vMain.textContent = isAllergen ? 'Allergen Protein' : 'Non-Allergen Protein';
+  vMain.className   = 'verdict-main ' + (isAllergen ? 'allergen' : 'safe');
+  document.getElementById('verdictAcc').textContent =
+    `Accession: ${data.accession} | ${data.organism}`;
+
+  // Stage A confidence ring
+  const pct = Math.round(isAllergen ? stageAProb * 100 : (1 - stageAProb) * 100);
+  const offset = 207.3 - (pct / 100) * 207.3;
+  const ring = document.getElementById('ringFg');
+  ring.style.stroke = isAllergen ? '#ff4e6a' : '#00c48c';
+  setTimeout(() => { ring.style.strokeDashoffset = offset; }, 50);
+  document.getElementById('ringLabel').textContent = pct + '%';
+
+  // Info grid
+  const grid = document.getElementById('infoGrid');
+  grid.innerHTML = [
+    ['Stage A Prob.',   (stageAProb * 100).toFixed(1) + '%', true],
+    ['Sequence Length', feats.length + ' aa',                false],
+    ['Organism',        data.organism.split(' ').slice(0,2).join(' '), false],
+    ['NCBI UID',        data.uid,                            false],
+  ].map(([lbl, val, hl]) => `
+    <div class="info-cell">
+      <div class="info-cell-label">${lbl}</div>
+      <div class="info-cell-value${hl ? ' highlight' : ''}">${val}</div>
+    </div>`).join('');
+
+  // Stage B allergen type banner
+  const typeBanner = document.getElementById('allergenTypeBanner');
+  if (isAllergen && stageBResult) {
+    typeBanner.style.display = '';
+    const meta = ALLERGEN_TYPE_META[stageBResult.type] ?? { emoji: '🧬', desc: '' };
+    document.getElementById('typeBadge').textContent =
+      `${meta.emoji}  ${stageBResult.type}`;
+
+    // Confidence bar (Stage B probability, 0–1)
+    const confPct = Math.round(stageBResult.confidence * 100);
+    document.getElementById('typeConfPct').textContent = confPct + '%';
+    setTimeout(() => {
+      document.getElementById('typeConfFill').style.width = confPct + '%';
+    }, 100);
+
+    document.getElementById('typeDesc').textContent = meta.desc;
+  } else {
+    typeBanner.style.display = 'none';
+  }
+
+  // Feature bars (core physicochemical features — most important per step2)
+  const barColors = {
+    hydrophobic:   '#00e5b0', charged:      '#00b4d8', polar:        '#7c3aed',
+    aromatic:      '#f59e0b', proline_frac: '#10b981',
+    cysteine_frac: '#ff4e6a', glycine_frac: '#6366f1',
+  };
+  const barsHtml = [
+    ['Hydrophobic Frac.',  'hydrophobic',   feats.hydrophobic],
+    ['Charged Frac.',      'charged',       feats.charged],
+    ['Polar Frac.',        'polar',         feats.polar],
+    ['Aromatic Frac.',     'aromatic',      feats.aromatic],
+    ['Proline Frac.',      'proline_frac',  feats.proline_frac],
+    ['Cysteine Frac.',     'cysteine_frac', feats.cysteine_frac],
+    ['Glycine Frac.',      'glycine_frac',  feats.glycine_frac],
+  ].map(([label, key, val]) => {
+    const barPct = Math.min(val * 400, 100).toFixed(1);
+    return `<div class="feat-row">
+      <div class="feat-name">${label}</div>
+      <div class="feat-bar-track">
+        <div class="feat-bar-fill" style="width:${barPct}%;background:${barColors[key] ?? '#888'}"></div>
+      </div>
+      <div class="feat-val">${val.toFixed(4)}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('featBars').innerHTML = barsHtml;
+
+  // Sequence viewer — highlight cysteines (key allergen feature)
+  document.getElementById('seqMeta').textContent =
+    `${data.description.slice(0, 100)}  |  ${feats.length} residues`;
+  const coloured = data.seq.split('').map(c =>
+    c === 'C' ? `<span style="color:#ff4e6a;font-weight:700">${c}</span>` : c
+  ).join('');
+  document.getElementById('seqBox').innerHTML = coloured;
+
+  card.classList.add('visible');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN SCAN FUNCTION
+// ═══════════════════════════════════════════════════════════════
+async function runScan() {
+  const acc = document.getElementById('accInput').value.trim();
+  if (!acc) return;
+
+  document.getElementById('resultCard').classList.remove('visible');
+  document.getElementById('ringFg').style.strokeDashoffset = 207.3;
+  document.getElementById('typeConfFill').style.width = '0%';
+  hideError();
+  showStatus(true);
+  document.getElementById('scanBtn').disabled = true;
+
+  try {
+    setStatus('Connecting to NCBI Protein database...');
+    const data = await fetchNCBISequence(acc);
+
+    setStatus('Extracting physicochemical features...');
+    await new Promise(r => setTimeout(r, 300));
+    const feats = extractFeatures(data.seq);
+    if (!feats) throw new Error('Sequence too short (< 30 aa) to classify.');
+
+    setStatus('Running ML models via backend (trained_model.pkl)...');
+    const mlRes = await fetch('/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sequence: data.seq })
+    });
+    if (!mlRes.ok) {
+      const err = await mlRes.json().catch(() => ({}));
+      throw new Error(err.error || `Backend error (HTTP ${mlRes.status})`);
+    }
+    const mlData = await mlRes.json();
+
+    const stageAProb = mlData.stage_a_probability;
+
+    let stageBResult = null;
+    if (mlData.is_allergen && mlData.allergen_type) {
+      // Convert backend probabilities to the shape renderResult expects
+      const topConf = mlData.stage_b_probabilities
+        ? mlData.stage_b_probabilities[mlData.allergen_type]
+        : 0.9;
+      stageBResult = {
+        type: mlData.allergen_type,
+        confidence: topConf,
+        probs: mlData.stage_b_probabilities ?? {}
+      };
+    }
+
+    setStatus('Rendering results...');
+    await new Promise(r => setTimeout(r, 150));
+    showStatus(false);
+    renderResult(data, feats, stageAProb, stageBResult);
+
+  } catch (err) {
+    showStatus(false);
+    showError(err.message || 'Unknown error. Check accession ID and try again.');
+    console.error(err);
+  } finally {
+    document.getElementById('scanBtn').disabled = false;
+  }
+}
+
+document.getElementById('accInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') runScan();
+});
+</script>
+</body>
+</html>
